@@ -3,12 +3,22 @@
 import numpy as np
 import pandas as pd
 import plotly.express
+import math
 
 def draw_roll_probs_figure(player_lvl, champ_tier, golds_to_roll,
-        n_cards_out_champ, n_cards_out_tier):
-    """TODO: Docstring for .
+                           n_cards_out_champ, n_cards_out_tier):
+    """Returns a figure giving the probabilities to find a certain number
+    of cards from a champ when rolling golds_to_roll.
+
+    :player_lvl: int
+    :champ_tier: int
+    :golds_to_roll: int
+    :n_cards_out_champ: (int)
+        The number of cards of the champ already out of the pool
+    :n_cards_out_tier: (int)
+        The number of cards of the pool already out not counting the champion
     """
-    number_of_rolls = golds_to_roll / 4
+    number_of_rolls = int(golds_to_roll / 4)
     champ_pool_size, tier_pool_size, tier_prob = get_tier_info(
             player_lvl, champ_tier)
 
@@ -22,11 +32,17 @@ def draw_roll_probs_figure(player_lvl, champ_tier, golds_to_roll,
                 )
                 for j in range(0,10)] for i in range(10)]
             )
-    numpy.fill_diagonal(transition_probability_matrix, 1-transition_probability_matrix.sum(1))
+    np.fill_diagonal(transition_probability_matrix, 
+                        1-transition_probability_matrix.sum(1))
 
-    probabilities = np.pow(transition_probability_matrix, number_of_rolls)[0,:]
+    probabilities = np.linalg.matrix_power(transition_probability_matrix, 
+                                           number_of_rolls)[0,:]
 
-    fig = plotly.express.line(probabilities, x="N cards found", y="Probability")
+    probabilities = pd.DataFrame(
+            probabilities.transpose(),
+            columns=["Probability"],
+            )
+    fig = plotly.express.line(probabilities,  y="Probability")
 
     return fig
 
@@ -35,20 +51,26 @@ def get_tier_info(player_lvl, champ_tier):
 
     :player_lvl: int
     :champ_tier: int
-    :returns: 
+    :returns:
         champ_pool_size : int
             Total size of the pool of the disered champ
         tier_pool_size : int
             Total size of the pool of the disered tier
         tier_prob : float
-            Probability, between 0 and 1, that one card is rolled in the desired champ tier.
+            Probability, between 0 and 1, that one card is rolled in the 
+            desired champ tier.
     """
-    tier_data = pd.read_csv("data/tier_stats.csv", header=0, index_col=0)[str(champ_tier)]
+    tier_data = pd.read_csv("data/tier_stats.csv", 
+            header=0, index_col=0)[str(champ_tier)]
 
-    return tier_data["pool"], tier_data["N_champs"]*tier_data["pool"], tier_data[str(player_lvl)]/100
+    return (tier_data["pool"], 
+            tier_data["N_champs"]*tier_data["pool"], 
+            tier_data[str(player_lvl)]/100)
 
-def probability_one_roll(tier_prob, champ_remaining_in_pool, remaining_tier_pool, n_cards_found):
-    """Returns the probability to find n_cards_found cards of the desired champ in the total pool
+def probability_one_roll(tier_prob, champ_remaining_in_pool,
+        remaining_tier_pool, n_cards_found):
+    """Returns the probability to find n_cards_found cards 
+    of the desired champ in the total pool
 
     :tier_prob: float
     :champ_remaining_in_pool: int
@@ -61,9 +83,15 @@ def probability_one_roll(tier_prob, champ_remaining_in_pool, remaining_tier_pool
     :returns: float
         The probability
     """
-    if n_cards_found > 5 or n_cards_found < 0:
+    if n_cards_found > 5 or n_cards_found <= 0 or champ_remaining_in_pool < 0:
         return 0
 
-    return maths.comb(5, n_cards_found) * ((tier_prob * champ_remaining_in_pool / remaining_tier_pool) ** n_cards_found) \
-            ((1-(tier_prob * champ_remaining_in_pool / remaining_tier_pool)) ** n_cards_found)
+    return (math.comb(5, n_cards_found) 
+            * ((tier_prob * champ_remaining_in_pool / remaining_tier_pool) 
+                ** n_cards_found) 
+            * ((1-(tier_prob * champ_remaining_in_pool / remaining_tier_pool)) 
+                ** n_cards_found))
 
+if __name__=="__main__":
+    draw_roll_probs_figure(8, 3, 200,
+                           10, 35).write_image("test/image1.png")
