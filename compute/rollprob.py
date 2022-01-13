@@ -5,6 +5,8 @@ import pandas as pd
 import plotly.express
 import math
 
+from compute.transition_matrix import TransitionMatrix
+
 def draw_roll_probs_figure(player_lvl, champ_tier, golds_to_roll,
                            n_cards_out_champ, n_cards_out_tier):
     """Returns a figure giving the probabilities to find a certain number
@@ -18,28 +20,18 @@ def draw_roll_probs_figure(player_lvl, champ_tier, golds_to_roll,
     :n_cards_out_tier: (int)
         The number of cards of the pool already out not counting the champion
     """
-    number_of_rolls = int(golds_to_roll / 4)
+    n_rolls = int(golds_to_roll / 4)
     champ_pool_size, tier_pool_size, tier_prob = get_tier_info(
             player_lvl, champ_tier)
 
-    transition_probability_matrix = np.matrix(
-            [[
-                probability_one_roll(
-                    tier_prob,
-                    champ_pool_size-n_cards_out_champ-i,
-                    tier_pool_size-n_cards_out_tier-n_cards_out_champ-i,
-                    j-i
-                )
-                for j in range(0,10)] for i in range(10)]
+    transition_probability_matrix = TransitionMatrix(
+            tier_prob, champ_pool_size, 
+            n_cards_out_champ,
+            tier_pool_size-n_cards_out_tier-n_cards_out_champ
             )
-    np.fill_diagonal(transition_probability_matrix, 
-                        1-transition_probability_matrix.sum(1))
-
-    probabilities = np.linalg.matrix_power(transition_probability_matrix, 
-                                           number_of_rolls)[0,:]
 
     probabilities = pd.DataFrame(
-            probabilities.transpose(),
+            transition_probability_matrix.get_probabilities(n_rolls),
             columns=["Probability"],
             )
     fig = plotly.express.line(probabilities,  y="Probability")
@@ -66,31 +58,6 @@ def get_tier_info(player_lvl, champ_tier):
     return (tier_data["pool"], 
             tier_data["N_champs"]*tier_data["pool"], 
             tier_data[str(player_lvl)]/100)
-
-def probability_one_roll(tier_prob, champ_remaining_in_pool,
-        remaining_tier_pool, n_cards_found):
-    """Returns the probability to find n_cards_found cards 
-    of the desired champ in the total pool
-
-    :tier_prob: float
-    :champ_remaining_in_pool: int
-        number of champs remaining in the pool
-    :remaining_tier_pool: int
-        total size of the tier pool
-    :n_cards_found: int
-        the number of cards of the desired champ found
-
-    :returns: float
-        The probability
-    """
-    if n_cards_found > 5 or n_cards_found <= 0 or champ_remaining_in_pool < 0:
-        return 0
-
-    return (math.comb(5, n_cards_found) 
-            * ((tier_prob * champ_remaining_in_pool / remaining_tier_pool) 
-                ** n_cards_found) 
-            * ((1-(tier_prob * champ_remaining_in_pool / remaining_tier_pool)) 
-                ** n_cards_found))
 
 if __name__=="__main__":
     draw_roll_probs_figure(8, 3, 200,
