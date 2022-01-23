@@ -171,3 +171,7 @@ Sessionx.vim
 tags
 # Persistent undo
 [._]*.un~
+
+# Javascript
+node_modules/
+.next
